@@ -8,6 +8,8 @@ Download `Pocketspace-Windows-x64.zip` from the [latest release](https://github.
 
 ## Quick demo
 
+![Pocketspace demo loading the sample files, applying a 75 percent reduction, comparing the original and compressed previews, and saving the JPEG](docs/screenshots/pocketspace-demo.gif)
+
 1. Click **Try sample files**. Pocketspace compresses the bundled photo and video and shows the savings in **Your files**.
 
    ![Pocketspace on Windows showing the bundled JPEG and MP4 with their original and compressed sizes](docs/screenshots/windows-results.png)
