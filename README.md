@@ -8,16 +8,17 @@ Download `Pocketspace-Windows-x64.zip` from the [latest release](https://github.
 
 ## Quick demo
 
-![Pocketspace demo loading the sample files, applying a 75 percent reduction, comparing the original and compressed previews, and saving the JPEG](docs/screenshots/pocketspace-demo.gif)
+![Pocketspace demo choosing a JPEG, applying a 75 percent reduction, comparing previews, and saving the compressed copy](docs/screenshots/pocketspace-demo.gif)
 
-1. Click **Try sample files**. Pocketspace compresses the bundled photo and video and shows the savings in **Your files**.
+1. Click **Choose files** and select a JPEG. Pocketspace compresses it and shows the savings in **Your files**.
+2. Click **Tune** beside the photo. Choose **Percentage smaller**, enter **75**, and click **Update preview**. The photo in this demo went from 650 KB to 161 KB.
+3. Switch between **Original** and **Compressed** to compare. Click **Save copy** to keep the smaller JPEG.
 
-   ![Pocketspace on Windows showing the bundled JPEG and MP4 with their original and compressed sizes](docs/screenshots/windows-results.png)
+### Screenshots
 
-2. Click **Tune** beside `Alpine-evening.jpg`. Choose **Percentage smaller**, enter **75**, and click **Update preview**. In this run, the photo went from 650 KB to 161 KB.
-3. Switch between **Original** and **Compressed** to compare. Click **Save copy** to keep the smaller version.
+![Pocketspace showing compression results for a photo selected using Choose files](docs/screenshots/windows-results.png)
 
-   ![The Tune dialog showing the compressed Alpine evening photo after a 75 percent reduction](docs/screenshots/windows-tune.png)
+![The Tune dialog showing the compressed photo and its file size](docs/screenshots/windows-tune.png)
 
 ## What you can do
 
