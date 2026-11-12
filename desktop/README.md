@@ -29,3 +29,7 @@ The rebuilt Windows app prepared valid ZIPs for both original and compressed sam
 The Windows package compressed padded 46 MB JPEG and 201 MB MP4 fixtures and verified that a 75 MB text file extracted unchanged from its ZIP. Batch tuning applied across `.jpg` and `.JPG`, skipped a file already within a fixed size cap, and left the MP4 output intact. The native replacement routine preserved a source whose bytes changed.
 
 The packaged app showed one confirmation for two local fixtures and preserved both when cancelled. A disposable build with test consent replaced two JPEGs at their original paths, verified their output hashes, and skipped a ZIP-only source.
+
+After removing the queue cap, a disposable Windows build accepted and compressed 25 JPEGs, included all 25 in a ZIP, and replaced all 25 originals with test consent.
+
+After removing the bundled samples and processing messages, the Windows package still accepted a JPEG through the file input, compressed it, and opened the Tune preview.

@@ -12,7 +12,7 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: AssemblyTitle("Pocketspace")]
 [assembly: AssemblyProduct("Pocketspace")]
-[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.0.1.0")]
 
 internal sealed class Pocketspace : Form
 {
@@ -146,7 +146,7 @@ internal sealed class Pocketspace : Form
     private void ConfirmBatch(ReplacementMessage message, List<string> paths)
     {
         if (IsDisposed) return;
-        if (replacement != null || message.files == null || message.files.Length != paths.Count || paths.Count > 20)
+        if (replacement != null || message.files == null || message.files.Length != paths.Count)
         {
             Reply(message.id, "error", "Windows couldn’t prepare this batch.");
             return;
