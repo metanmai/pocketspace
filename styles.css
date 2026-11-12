@@ -26,12 +26,10 @@ svg:not(.hero-art) { display: block; width: 1.25em; height: 1.25em; flex: none; 
 
 .topbar { background: #fff; border-bottom: 1px solid var(--line); }
 .top-inner, .shell { width: min(1120px, calc(100% - 64px)); margin-inline: auto; }
-.top-inner { min-height: 68px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.top-inner { min-height: 68px; display: flex; align-items: center; }
 .wordmark { display: inline-flex; align-items: center; gap: 10px; font-size: 21px; line-height: 1; letter-spacing: -.065em; font-weight: 760; text-decoration: none; }
 .mark { display: grid; place-items: center; width: 34px; height: 34px; background: var(--accent); color: #fff; border-radius: 10px; font-size: 17px; }
-.private-badge { display: flex; align-items: center; gap: 7px; border: 1px solid #e5dfef; border-radius: 50px; background: #fbfaff; padding: 6px 10px; color: #51446d; font-size: 12px; font-weight: 650; white-space: nowrap; }
-.private-badge svg { color: var(--accent); }
-.shell { padding-top: 29px; }
+.shell { padding-block: 29px 25px; }
 .hero { position: relative; isolation: isolate; overflow: hidden; min-height: 233px; display: flex; align-items: center; border-radius: 23px; background: radial-gradient(ellipse at 82% 40%, #4b348d 0%, transparent 59%), linear-gradient(115deg, #241946, #31205e 75%, #392766); color: #fff; }
 .hero-copy { padding: 32px 40px; }
 .eyebrow { color: #e3d9ff; display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 730; letter-spacing: .15em; }
@@ -57,7 +55,7 @@ h1 { margin: 8px 0 9px; font-size: clamp(38px, 5vw, 59px); font-weight: 760; lin
 .accent { background: var(--accent); color: #fff; }
 .accent:hover { background: var(--accent-dark); }
 .format-note, .add-footer { color: var(--muted); font-size: 12px; }
-.add-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px 15px; flex-wrap: wrap; margin-top: 10px; }
+.add-footer { margin-top: 10px; }
 .text-button { background: transparent; border: 0; padding: 5px 0; display: inline-flex; align-items: center; gap: 6px; color: var(--accent-dark); font-size: 12px; font-weight: 720; white-space: nowrap; }
 .text-button:hover { text-decoration: underline; }
 .notice { margin-top: 10px; padding: 8px 10px; border-radius: 8px; color: #633e0d; background: #fff3dd; font-size: 13px; }
@@ -75,12 +73,7 @@ h1 { margin: 8px 0 9px; font-size: clamp(38px, 5vw, 59px); font-weight: 760; lin
 .profile small { color: var(--muted); font-size: 12px; }
 .profile i { width: 15px; height: 15px; border: 1.5px solid #ada4be; border-radius: 50%; flex: none; }
 .profile:has(:checked) i { border: 4px solid var(--accent); background: #fff; }
-.privacy-card { display: flex; align-items: flex-start; gap: 11px; border: 1px solid #dce8ce; border-radius: 15px; background: #f0f7e7; padding: 15px; color: #2c4725; }
-.privacy-icon { flex: none; width: 31px; height: 31px; display: grid; place-items: center; border-radius: 9px; background: #dfedcf; color: #3e652c; font-size: 13px; }
-.privacy-card h2 { font-size: 13px; font-weight: 760; margin-bottom: 2px; }
-.privacy-card p, .compatibility { font-size: 12px; }
-.privacy-card p { color: #415738; }
-.compatibility { padding: 0 3px; color: var(--muted); }
+.compatibility { padding: 0 3px; color: var(--muted); font-size: 12px; }
 
 .results-heading { margin-bottom: 12px; }
 .clear { margin-left: auto; }
@@ -117,8 +110,6 @@ h1 { margin: 8px 0 9px; font-size: clamp(38px, 5vw, 59px); font-weight: 760; lin
 .archive-opener small { color: var(--muted); font-size: 12px; }
 .archive-opener .archive-arrow { margin-left: auto; color: var(--accent-dark); }
 
-footer { display: flex; justify-content: space-between; gap: 10px; padding: 19px 1px 25px; color: var(--muted); font-size: 12px; }
-.footer-dot { color: var(--accent); }
 dialog { width: min(730px, calc(100% - 28px)); max-height: calc(100dvh - 28px); border: 1px solid var(--line); border-radius: 18px; padding: 17px; color: var(--ink); background: #fff; box-shadow: 0 15px 80px #1d13346b; }
 dialog::backdrop { background: #201637a3; }
 .dialog-heading { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
@@ -177,9 +168,7 @@ dialog::backdrop { background: #201637a3; }
   .profile-card { order: 1; }
   .add-card { order: 2; }
   .results-card { order: 3; }
-  .privacy-card { order: 4; }
-  .compatibility { order: 5; }
-  footer { order: 6; padding-top: 1px; }
+  .compatibility { order: 4; }
   .profiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
   .profile { justify-content: center; text-align: center; padding: 6px 3px; min-height: 44px; }
   .profile small, .profile i, .profile > svg { display: none; }

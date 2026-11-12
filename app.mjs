@@ -5,7 +5,6 @@ import { contentId, uniqueName, zipFiles, zipLimit } from './archive.mjs';
 const $ = id => document.getElementById(id);
 const files = [];
 const updateArchive = bindArchive(() => files);
-const maxFiles = 20;
 const labels = { detail: 'More detail', balanced: 'Balanced', small: 'Smallest files' };
 const zipLabels = { detail: 'Fast', balanced: 'Balanced', small: 'Maximum compression' };
 const imageExtensions = /\.(jpe?g|png|apng|webp|heic|heif|avif|bmp|gif)$/i;
@@ -94,7 +93,7 @@ function matchingFiles(item) {
 }
 
 function canReplace(item) {
-  if (!fileBridge || !item.local || !item.result || item.result.extension === 'zip') return false;
+  if (!fileBridge || !item.result || item.result.extension === 'zip') return false;
   const suffix = extension(item.file.name);
   return item.result.extension === (suffix === 'jpeg' ? 'jpg' : suffix);
 }
@@ -147,18 +146,16 @@ function invalidateZip() {
   $('download-all').insertAdjacentHTML('afterbegin', `${icon('download')} Save all as ZIP`);
 }
 
-function addFiles(selection, local = true) {
+function addFiles(selection) {
   if (replacing) return;
   $('replacement-status').hidden = true;
   const selectedProfile = document.querySelector('input[name="profile"]:checked').value;
-  let excluded = 0;
   for (const file of selection) {
-    if (files.length >= maxFiles) { excluded++; continue; }
     let kind = 'zip';
     if (file.type.startsWith('image/') || imageExtensions.test(file.name)) kind = 'photo';
     if (file.type.startsWith('video/') || videoExtensions.test(file.name)) kind = 'video';
     const item = {
-      file, kind, local, settings: { mode: kind === 'zip' ? 'zip' : 'preset', profile: selectedProfile },
+      file, kind, settings: { mode: kind === 'zip' ? 'zip' : 'preset', profile: selectedProfile },
       controller: new AbortController(), pending: false,
     };
     item.ui = rowFor(item);
@@ -171,7 +168,7 @@ function addFiles(selection, local = true) {
       showState(item, `Queued · ${settingsLabel(item)}`);
     }
   }
-  notice(excluded ? `The queue holds ${maxFiles} files. ${excluded} ${excluded === 1 ? 'file was' : 'files were'} skipped.` : '');
+  notice('');
   updateSummary();
   void runQueue();
 }
@@ -531,24 +528,6 @@ window.addEventListener('dragover', event => {
 });
 window.addEventListener('drop', event => {
   if (event.dataTransfer.types.includes('Files')) event.preventDefault();
-});
-
-$('demo').addEventListener('click', async () => {
-  const button = $('demo');
-  button.disabled = true;
-  try {
-    const samples = await Promise.all(['Alpine-evening.jpg', 'Alpine-evening.mp4'].map(async name => {
-      const response = await fetch(`./samples/${name}`);
-      if (!response.ok) throw new Error('Sample unavailable');
-      const blob = await response.blob();
-      return new File([blob], name, { type: blob.type });
-    }));
-    addFiles(samples, false);
-  } catch {
-    notice('Couldn’t load the sample files. You can still choose files from your device.');
-  } finally {
-    button.disabled = false;
-  }
 });
 
 $('clear').addEventListener('click', () => {
