@@ -12,7 +12,7 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: AssemblyTitle("Pocketspace")]
 [assembly: AssemblyProduct("Pocketspace")]
-[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.1.1.0")]
 
 internal sealed class Pocketspace : Form
 {
