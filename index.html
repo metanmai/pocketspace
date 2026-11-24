@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f7fc">
-  <meta name="description" content="Compress photos, videos, and other files.">
+  <meta name="description" content="Compress files locally in your browser, fit photos and videos into a size-limited ZIP, or download Pocketspace for Windows.">
   <title>Pocketspace · File compressor</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
@@ -31,6 +31,7 @@
   <header class="topbar">
     <div class="top-inner">
       <a class="wordmark" href="./" aria-label="Pocketspace home"><span class="mark"><svg><use href="#logo"/></svg></span>Pocketspace</a>
+      <a id="windows-download" class="button accent" href="https://github.com/metanmai/pocketspace/releases/latest/download/Pocketspace-Windows-x64.zip"><svg aria-hidden="true"><use href="#download"/></svg> Download for Windows</a>
     </div>
   </header>
 
@@ -83,8 +84,12 @@
           <div id="dropzone" class="dropzone">
             <span class="drop-icon"><svg><use href="#layers"/></svg></span>
             <label class="drop-title" for="file-input"><span class="drag-label">Drop files here</span><span class="touch-label">Add files</span></label>
-            <button type="button" id="browse" class="button accent"><svg><use href="#upload"/></svg> Choose files</button>
+            <div class="add-actions">
+              <button type="button" id="browse" class="button accent"><svg><use href="#upload"/></svg> Choose files</button>
+              <button type="button" id="browse-media" class="button" hidden><svg><use href="#image"/></svg> Photos &amp; videos</button>
+            </div>
             <input type="file" id="file-input" multiple hidden>
+            <input type="file" id="send-to-input" multiple hidden>
             <p class="format-note">Photo and video compression · Lossless ZIP for other files</p>
           </div>
           <p class="add-footer">Up to 64 megapixels for photo re-encoding · Files under 4 GB for lossless ZIP</p>
@@ -101,6 +106,7 @@
           <ul id="results" class="results" aria-label="Compression results"></ul>
           <div id="result-summary" class="result-summary" hidden><strong id="total-saved"></strong><div class="result-actions"><button type="button" class="button" id="replace-originals" hidden>Replace originals…</button><button type="button" class="button accent" id="download-all"><svg><use href="#download"/></svg> Save all as ZIP</button></div></div>
           <p id="replacement-status" class="compression-status" role="status" hidden></p>
+          <button type="button" class="archive-opener" id="open-fit-to-send" aria-haspopup="dialog" hidden><span class="heading-icon"><svg><use href="#share"/></svg></span><span><strong>Fit to Send</strong><small>Share photos and videos under a ZIP size limit</small></span><svg class="archive-arrow"><use href="#arrow"/></svg></button>
           <button type="button" class="archive-opener" id="open-archive" aria-haspopup="dialog" hidden><span class="heading-icon"><svg><use href="#share"/></svg></span><span><strong>Transfer &amp; archive</strong><small>Send originals or compressed copies</small></span><svg class="archive-arrow"><use href="#arrow"/></svg></button>
           <div id="live-status" role="status" class="sr-only"></div>
         </section>
@@ -163,7 +169,39 @@
     </div>
     <div id="preview-controls" class="preview-controls" role="group" aria-label="File version"><button type="button" data-version="original" aria-pressed="true">Original</button><button type="button" data-version="compressed" aria-pressed="false">Compressed</button></div>
     <div id="preview-media" class="preview-media"></div>
+    <p class="compression-status" id="preview-export-status" role="status" hidden></p>
     <div class="dialog-footer"><a class="button accent" id="preview-save" hidden><svg><use href="#download"/></svg> Save copy</a></div>
+  </dialog>
+
+  <dialog id="fit-to-send" class="archive-dialog" aria-labelledby="fit-title">
+    <div class="dialog-heading">
+      <div><h2 id="fit-title">Fit to Send</h2><p>Fit your queued photos and videos under a ZIP size limit.</p></div>
+      <form method="dialog"><button class="icon-button" aria-label="Close Fit to Send"><svg><use href="#close"/></svg></button></form>
+    </div>
+    <form id="fit-form">
+      <fieldset id="fit-settings">
+        <label class="fit-limit">ZIP size limit (MB)<input id="fit-limit" type="number" inputmode="decimal" min="0.000001" max="400" step="0.000001" value="10" required></label>
+        <label class="fit-privacy" id="fit-privacy-label"><input type="checkbox" id="fit-privacy"> Remove location metadata from photos</label>
+        <div id="fit-photos"></div>
+      </fieldset>
+      <div class="archive-actions">
+        <button class="button accent" id="fit-prepare">Prepare ZIP</button>
+        <button type="button" class="button" id="fit-split" hidden>Split into ZIPs</button>
+        <button type="button" class="button accent" id="fit-share" hidden><svg><use href="#share"/></svg> Share ZIP</button>
+      </div>
+    </form>
+    <p id="fit-status" class="archive-status" role="status"></p>
+    <section id="fit-review" aria-labelledby="fit-review-title" hidden>
+      <h3 id="fit-review-title">In the ZIP</h3>
+      <label id="fit-part-picker" hidden>ZIP to preview and share <select id="fit-part"></select></label>
+      <label class="sr-only" for="fit-review-file">File to preview</label>
+      <select id="fit-review-file"></select>
+      <p class="archive-status" id="fit-review-details"></p>
+      <img id="fit-review-image" alt="">
+      <video id="fit-review-video" controls playsinline hidden></video>
+      <p id="fit-review-error" class="archive-status" hidden>This device can’t preview this file.</p>
+      <button type="button" class="button" id="fit-review-keep" hidden>Keep original and refit</button>
+    </section>
   </dialog>
 
   <dialog id="archive" class="archive-dialog" aria-labelledby="archive-title">
@@ -180,7 +218,7 @@
     <div class="archive-actions">
       <button type="button" class="button accent" id="archive-share" hidden><svg><use href="#share"/></svg> Share files</button>
       <button type="button" class="button" id="archive-zip"><svg><use href="#download"/></svg> <span>Prepare ZIP</span></button>
-      <a class="button accent" id="archive-download" hidden><svg><use href="#download"/></svg> Download ZIP</a>
+      <a class="button accent" id="archive-download" hidden><svg><use href="#download"/></svg><span>Download ZIP</span></a>
       <button type="button" class="button" id="archive-folder" hidden><svg><use href="#folder"/></svg> Sync to folder</button>
     </div>
     <p id="archive-zip-help" class="archive-help" hidden>ZIPs are limited to 400 MB. Use a smaller batch or sync directly to a folder where supported.</p>

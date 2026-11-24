@@ -1,5 +1,6 @@
 import { compressFileToZip } from './archive.mjs';
 import { createDiskOutput, diskThreshold } from './output.mjs';
+import { asBlob, compressNativeVideo, mobile, nativeVideo } from './mobile.mjs';
 
 export const zipInputLimit = 4e9;
 const photoPixelLimit = 64_000_000;
@@ -36,7 +37,7 @@ async function isAnimated(file) {
 async function photo(file, profile, signal, targetBytes) {
   if (await isAnimated(file)) throw new MediaError('Animated images are skipped to preserve motion.');
   signal.throwIfAborted();
-  const url = URL.createObjectURL(file);
+  const url = URL.createObjectURL(await asBlob(file, signal));
   const image = new Image();
   const canvas = document.createElement('canvas');
   try {
@@ -111,6 +112,12 @@ async function photo(file, profile, signal, targetBytes) {
   }
 }
 
+export async function photoWithoutMetadata(file, signal, targetBytes) {
+  const { blob, extension } = await photo(file, { photoEdge: Infinity, photoQuality: .95 }, signal, targetBytes);
+  const name = file.name.replace(/(?<=.)\.[^.]+$/, '') || 'Photo';
+  return { blob, name: `${name}-location-removed.${extension}` };
+}
+
 async function video(file, profile, signal, update, targetBytes) {
   if (!('VideoEncoder' in window) || !('VideoDecoder' in window)) {
     throw new MediaError('Video compression needs a browser with WebCodecs support.');
@@ -118,7 +125,7 @@ async function video(file, profile, signal, update, targetBytes) {
   const {
     ALL_FORMATS, BlobSource, BufferTarget, Conversion, Input, Mp4OutputFormat, Output, Quality, StreamTarget, WebMOutputFormat,
   } = await import('./vendor/mediabunny.mjs');
-  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(file) });
+  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(await asBlob(file, signal)) });
   try {
     const [track, audio] = await Promise.all([input.getPrimaryVideoTrack(), input.getPrimaryAudioTrack()]);
     if (!track || !await track.canDecode()) throw new MediaError('This browser can’t decode the video codec.');
@@ -241,7 +248,15 @@ export async function compress(file, kind, profileName, signal, update, targetBy
       throw new MediaError('Couldn’t create the ZIP. Check available disk space and try again.');
     }
   } else {
-    result = await (kind === 'photo' ? photo(file, profile, signal, targetBytes) : video(file, profile, signal, update, targetBytes));
+    try {
+      if (kind === 'photo') result = await photo(file, profile, signal, targetBytes);
+      else if (nativeVideo) result = await compressNativeVideo(file, profileName, signal, update, targetBytes);
+      else result = await video(file, profile, signal, update, targetBytes);
+    } catch (error) {
+      signal.throwIfAborted();
+      if (mobile && kind === 'video' && !(error instanceof MediaError)) throw new MediaError(error.message);
+      throw error;
+    }
   }
   if (signal.aborted || result.blob.size >= file.size) await result.dispose?.();
   signal.throwIfAborted();

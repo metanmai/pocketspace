@@ -1,10 +1,14 @@
 import { compress, MediaError } from './compress.mjs';
 import { bindArchive } from './archive-ui.mjs';
+import { bindFitToSend } from './fit-to-send-ui.mjs';
 import { contentId, uniqueName, zipFiles, zipLimit } from './archive.mjs';
+import { mediaUrl, mobile, pickFiles, playNative, receiveSharedPhotos, releaseFile, revokeMediaUrl, saveMobile } from './mobile.mjs';
 
 const $ = id => document.getElementById(id);
 const files = [];
+$('windows-download').hidden = mobile || window.pocketspaceHost === 'windows';
 const updateArchive = bindArchive(() => files);
+const fitToSend = bindFitToSend(() => files, bytes, saveWindowsZip);
 const labels = { detail: 'More detail', balanced: 'Balanced', small: 'Smallest files' };
 const zipLabels = { detail: 'Fast', balanced: 'Balanced', small: 'Maximum compression' };
 const imageExtensions = /\.(jpe?g|png|apng|webp|heic|heif|avif|bmp|gif)$/i;
@@ -13,8 +17,11 @@ let running = false;
 let previewItem;
 let previewVersion;
 let zipUrl;
+let zipOutput;
 let zipController;
 let replacing = false;
+let picking = false;
+let saving = false;
 const fileBridge = window.pocketspaceHost === 'windows'
   && typeof window.chrome?.webview?.postMessageWithAdditionalObjects === 'function'
   ? window.chrome.webview : undefined;
@@ -62,6 +69,9 @@ function rowFor(item) {
   view.addEventListener('click', () => openPreview(item));
   const save = iconAction('a', 'download', 'Save copy of', item);
   save.hidden = true;
+  save.addEventListener('click', event => {
+    if (item.result) saveOnMobile(event, item.result.blob, item.result.name);
+  });
   const remove = iconAction('button', 'close', 'Remove', item);
   remove.classList.add('remove');
   remove.addEventListener('click', () => { if (!replacing) removeItem(item); });
@@ -132,14 +142,18 @@ function updateSummary() {
   $('download-all').hidden = ready.length < 2 || Boolean(zipUrl);
   $('replace-originals').hidden = !ready.some(canReplace);
   $('replace-originals').disabled = replacing || files.some(item => item.pending || !item.ui.progress.hidden);
-  $('browse').disabled = $('clear').disabled = replacing;
+  $('browse').disabled = $('browse-media').disabled = replacing || picking;
+  $('clear').disabled = replacing;
   for (const { ui } of files) ui.remove.disabled = ui.view.disabled = replacing;
   updateArchive();
+  fitToSend.update();
 }
 
 function invalidateZip() {
   zipController?.abort();
-  if (zipUrl) URL.revokeObjectURL(zipUrl);
+  revokeMediaUrl(zipUrl);
+  void zipOutput?.dispose?.();
+  zipOutput = undefined;
   zipUrl = undefined;
   $('zip-link')?.remove();
   $('download-all').textContent = '';
@@ -150,6 +164,7 @@ function addFiles(selection) {
   if (replacing) return;
   $('replacement-status').hidden = true;
   const selectedProfile = document.querySelector('input[name="profile"]:checked').value;
+  const added = [];
   for (const file of selection) {
     let kind = 'zip';
     if (file.type.startsWith('image/') || imageExtensions.test(file.name)) kind = 'photo';
@@ -160,6 +175,7 @@ function addFiles(selection) {
     };
     item.ui = rowFor(item);
     files.push(item);
+    added.push(item);
     if (!file.size) {
       showState(item, 'Empty file.', true);
     } else {
@@ -171,7 +187,32 @@ function addFiles(selection) {
   notice('');
   updateSummary();
   void runQueue();
+  return added;
 }
+
+const incomingPhotos = [];
+function openSharedPhotos() {
+  if (document.querySelector('dialog[open]') || !incomingPhotos.length) return;
+  const { selection, skipped } = incomingPhotos.shift();
+  if (selection.length) fitToSend.open(addFiles(selection));
+  if (skipped) notice(`${skipped} shared ${skipped === 1 ? 'photo couldn’t' : 'photos couldn’t'} be opened.`);
+  if (!selection.length) openSharedPhotos();
+}
+
+for (const dialog of document.querySelectorAll('dialog')) {
+  dialog.addEventListener('close', openSharedPhotos);
+}
+$('send-to-input').addEventListener('change', event => {
+  const input = event.currentTarget;
+  const items = addFiles(input.files);
+  input.value = '';
+  const media = items.filter(({ kind, file }) => (kind === 'photo' || kind === 'video') && file.size);
+  if (media.length) fitToSend.open(media);
+});
+void receiveSharedPhotos((selection, skipped) => {
+  incomingPhotos.push({ selection, skipped });
+  openSharedPhotos();
+}).catch(() => notice('Couldn’t receive shared photos.'));
 
 async function runQueue() {
   if (running) return;
@@ -201,7 +242,7 @@ async function runQueue() {
         }, target);
         if (result) {
           item.result = result;
-          item.outputUrl = URL.createObjectURL(result.blob);
+          item.outputUrl = mediaUrl(result.blob);
           save.href = item.outputUrl;
           save.download = result.name;
           save.hidden = false;
@@ -256,15 +297,17 @@ function removeItem(item) {
   item.controller.abort();
   if (item.result) invalidateZip();
   clearOutput(item);
-  if (item.originalUrl) URL.revokeObjectURL(item.originalUrl);
+  revokeMediaUrl(item.originalUrl);
+  void releaseFile(item.file);
   item.ui.row.remove();
   files.splice(files.indexOf(item), 1);
   updateSummary();
 }
 
 function openPreview(item) {
+  $('preview-export-status').hidden = true;
   previewItem = item;
-  item.originalUrl ??= URL.createObjectURL(item.file);
+  item.originalUrl ??= mediaUrl(item.file);
   $('preview-title').textContent = item.file.name;
   const { mode, profile, amount, unit } = item.settings;
   $('compression-mode').value = mode;
@@ -303,7 +346,7 @@ for (const id of ['file-size', 'file-unit']) {
 
 function clearOutput(item) {
   if (item.outputUrl) {
-    URL.revokeObjectURL(item.outputUrl);
+    revokeMediaUrl(item.outputUrl);
     item.outputUrl = undefined;
     void item.result.dispose?.();
     item.result = undefined;
@@ -382,8 +425,18 @@ function showVersion(version) {
     }
     media.addEventListener('error', () => {
       if (container.firstElementChild !== media) return;
-      const fallback = document.createElement('p');
-      fallback.textContent = 'This browser can’t preview this file.';
+      const source = original ? previewItem?.file : previewItem?.result?.blob;
+      const fallback = document.createElement(source?.token && isVideo ? 'button' : 'p');
+      if (fallback.tagName === 'BUTTON') {
+        fallback.type = 'button';
+        fallback.className = 'button';
+        fallback.textContent = 'Open video preview';
+        fallback.addEventListener('click', () => {
+          void playNative(source).catch(() => { fallback.textContent = 'Couldn’t open video preview'; });
+        });
+      } else {
+        fallback.textContent = mobile ? 'This device can’t preview this file.' : 'This browser can’t preview this file.';
+      }
       container.replaceChildren(fallback);
     });
     media.src = original ? previewItem.originalUrl : previewItem.outputUrl;
@@ -403,7 +456,7 @@ function replacementReply(id, action, fields = {}, attachments) {
       if (data.state === 'error') reject(new Error(data.message));
       else resolve(data);
     };
-    const timer = action === 'replace-chunk' ? setTimeout(() => {
+    const timer = action.endsWith('-chunk') ? setTimeout(() => {
       fileBridge.removeEventListener('message', receive);
       reject(new Error('Pocketspace stopped receiving file data.'));
     }, 30000) : undefined;
@@ -427,6 +480,27 @@ function base64(bytes) {
     binary += String.fromCharCode(...bytes.subarray(offset, offset + 16384));
   }
   return btoa(binary);
+}
+
+async function saveWindowsZip(blob, name, signal) {
+  const id = crypto.randomUUID();
+  try {
+    const reply = await replacementReply(id, 'fit-save-open', { name, outputSize: blob.size });
+    if (reply.state === 'cancelled') return false;
+    const chunkSize = 256 * 1024;
+    for (let offset = 0; offset < blob.size; offset += chunkSize) {
+      signal.throwIfAborted();
+      const chunk = new Uint8Array(await blob.slice(offset, offset + chunkSize).arrayBuffer());
+      signal.throwIfAborted();
+      await replacementReply(id, 'fit-save-chunk', { data: base64(chunk) });
+    }
+    signal.throwIfAborted();
+    await replacementReply(id, 'fit-save-end');
+    return true;
+  } catch (error) {
+    fileBridge.postMessage({ id, action: 'fit-save-cancel' });
+    throw error;
+  }
 }
 
 async function replaceFile(item, id) {
@@ -499,7 +573,63 @@ $('replace-originals').addEventListener('click', async () => {
   }
 });
 
-$('browse').addEventListener('click', () => $('file-input').click());
+async function browse(mediaOnly = false) {
+  if (!mobile) {
+    $('file-input').click();
+    return;
+  }
+  if (picking) return;
+  picking = true;
+  updateSummary();
+  try {
+    addFiles(await pickFiles(mediaOnly));
+  } catch (error) {
+    if (error.name !== 'AbortError') notice(error.message || 'Couldn’t open files.');
+  } finally {
+    picking = false;
+    updateSummary();
+  }
+}
+
+async function saveOnMobile(event, file, name) {
+  if (!mobile) return;
+  event.preventDefault();
+  if (saving) return;
+  const status = $('preview-export-status');
+  const inPreview = $('preview').open;
+  function report(message) {
+    if (inPreview && $('preview').open) {
+      status.textContent = message;
+      status.hidden = !message;
+    } else {
+      notice(message);
+    }
+  }
+  saving = true;
+  report('Preparing to save…');
+  try {
+    await saveMobile(file, name);
+    report(`Saved ${name}.`);
+  } catch (error) {
+    report(error.name === 'AbortError' ? '' : error.message || 'Couldn’t save the copy.');
+  } finally {
+    saving = false;
+  }
+}
+
+$('browse').addEventListener('click', () => void browse());
+$('preview-save').addEventListener('click', event => {
+  const result = previewItem?.result;
+  if (result) saveOnMobile(event, result.blob, result.name);
+});
+if (mobile) {
+  $('browse-media').hidden = false;
+  $('browse-media').addEventListener('click', () => void browse(true));
+  document.querySelector('.drop-title').addEventListener('click', event => {
+    event.preventDefault();
+    void browse();
+  });
+}
 $('file-input').addEventListener('change', event => {
   addFiles(event.currentTarget.files);
   event.currentTarget.value = '';
@@ -550,8 +680,9 @@ $('preview').addEventListener('close', () => {
 $('download-all').addEventListener('click', async () => {
   const button = $('download-all');
   const ready = files.filter(item => item.result);
-  zipController = new AbortController();
-  const { signal } = zipController;
+  const controller = new AbortController();
+  zipController = controller;
+  const { signal } = controller;
   button.disabled = true;
   button.textContent = 'Preparing ZIP…';
   try {
@@ -561,14 +692,17 @@ $('download-all').addEventListener('click', async () => {
     const names = new Set();
     const entries = ready.map(({ result }) => ({ name: uniqueName(result.name, names), blob: result.blob }));
     const archive = await zipFiles(entries, signal);
+    if (signal.aborted) await archive.dispose?.();
     signal.throwIfAborted();
-    zipUrl = URL.createObjectURL(archive);
+    zipOutput = archive;
+    zipUrl = mediaUrl(archive.blob);
     const link = document.createElement('a');
     link.id = 'zip-link';
     link.className = 'button accent';
     link.href = zipUrl;
     link.download = 'Pocketspace-compressed.zip';
-    link.innerHTML = `${icon('download')} Download ZIP`;
+    link.innerHTML = `${icon('download')} ${mobile ? 'Save ZIP' : 'Download ZIP'}`;
+    link.addEventListener('click', event => saveOnMobile(event, archive.blob, link.download));
     button.after(link);
     button.hidden = true;
     link.focus();
@@ -577,8 +711,10 @@ $('download-all').addEventListener('click', async () => {
       notice(error instanceof MediaError ? error.message : 'Couldn’t prepare the ZIP. You can still save copies individually.');
     }
   } finally {
-    zipController = undefined;
-    button.disabled = false;
-    button.innerHTML = `${icon('download')} Save all as ZIP`;
+    if (zipController === controller) {
+      zipController = undefined;
+      button.disabled = false;
+      button.innerHTML = `${icon('download')} Save all as ZIP`;
+    }
   }
 });
