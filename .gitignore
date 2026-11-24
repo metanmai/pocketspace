@@ -2,3 +2,10 @@
 /Windows/
 /Pocketspace-Windows-x64.zip
 *.user
+/mobile/android/.gradle/
+/mobile/android/.idea/
+/mobile/android/app/build/
+/mobile/android/build/
+/mobile/android/local.properties
+/mobile/android/Pocketspace-Android.apk
+/mobile/ios/**/xcuserdata/

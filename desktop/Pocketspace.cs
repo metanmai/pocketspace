@@ -12,7 +12,7 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: AssemblyTitle("Pocketspace")]
 [assembly: AssemblyProduct("Pocketspace")]
-[assembly: AssemblyVersion("1.0.1.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
 
 internal sealed class Pocketspace : Form
 {
@@ -22,6 +22,10 @@ internal sealed class Pocketspace : Form
     private Replacement replacement;
     private string replacementBatchId;
     private readonly Dictionary<string, Replacement> approved = new Dictionary<string, Replacement>();
+    private readonly string[] launchFiles;
+    private string zipId, zipPath, zipStagingPath;
+    private FileStream zipStream;
+    private long zipSize;
 
     private sealed class ReplacementMessage
     {
@@ -49,15 +53,21 @@ internal sealed class Pocketspace : Form
     }
 
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        Application.Run(new Pocketspace());
+        var files = new List<string>();
+        foreach (string arg in args)
+        {
+            if (File.Exists(arg)) files.Add(Path.GetFullPath(arg));
+        }
+        Application.Run(new Pocketspace(files.ToArray()));
     }
 
-    private Pocketspace()
+    private Pocketspace(string[] files)
     {
+        launchFiles = files;
         Text = "Pocketspace";
         Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         ClientSize = new Size(1160, 820);
@@ -88,6 +98,7 @@ internal sealed class Pocketspace : Form
             browser.Settings.IsStatusBarEnabled = false;
             browser.DownloadStarting += SaveDownload;
             browser.WebMessageReceived += HandleReplacementMessage;
+            if (launchFiles.Length > 0) browser.NavigationCompleted += ImportLaunchFiles;
             browser.NewWindowRequested += (source, request) => request.Handled = true;
             browser.NavigationStarting += (source, request) =>
             {
@@ -113,6 +124,26 @@ internal sealed class Pocketspace : Form
         }
     }
 
+    private async void ImportLaunchFiles(object sender, CoreWebView2NavigationCompletedEventArgs args)
+    {
+        var browser = webView.CoreWebView2;
+        if (!args.IsSuccess || browser.Source != "https://" + AppHost + "/index.html") return;
+        browser.NavigationCompleted -= ImportLaunchFiles;
+        try
+        {
+            var document = json.DeserializeObject(await browser.CallDevToolsProtocolMethodAsync("DOM.getDocument", "{}")) as Dictionary<string, object>;
+            var root = (Dictionary<string, object>)document["root"];
+            var node = json.DeserializeObject(await browser.CallDevToolsProtocolMethodAsync("DOM.querySelector",
+                json.Serialize(new { nodeId = root["nodeId"], selector = "#send-to-input" }))) as Dictionary<string, object>;
+            await browser.CallDevToolsProtocolMethodAsync("DOM.setFileInputFiles",
+                json.Serialize(new { nodeId = node["nodeId"], files = launchFiles }));
+        }
+        catch (Exception)
+        {
+            if (!IsDisposed) MessageBox.Show(this, "Couldn’t open the files sent to Pocketspace.", Text);
+        }
+    }
+
     private void HandleReplacementMessage(object sender, CoreWebView2WebMessageReceivedEventArgs args)
     {
         if (args.Source != "https://" + AppHost + "/index.html" && args.Source != "https://" + AppHost + "/") return;
@@ -121,6 +152,11 @@ internal sealed class Pocketspace : Form
         catch (ArgumentException) { return; }
         catch (InvalidOperationException) { return; }
         if (message == null || string.IsNullOrEmpty(message.id)) return;
+        if (message.action != null && message.action.StartsWith("fit-save-", StringComparison.Ordinal))
+        {
+            BeginInvoke((Action)(() => SaveFitZip(message)));
+            return;
+        }
         if (message.action == "replace-batch")
         {
             var paths = new List<string>();
@@ -141,6 +177,86 @@ internal sealed class Pocketspace : Form
             BeginInvoke((Action)(() => ConfirmBatch(message, paths)));
         }
         else BeginInvoke((Action)(() => ProcessReplacement(message)));
+    }
+
+    private void ResetFitSave()
+    {
+        if (zipStream != null) zipStream.Dispose();
+        zipStream = null;
+        if (zipStagingPath != null)
+        {
+            try { File.Delete(zipStagingPath); } catch (IOException) {} catch (UnauthorizedAccessException) {}
+        }
+        zipId = zipPath = zipStagingPath = null;
+    }
+
+    private void SaveFitZip(ReplacementMessage request)
+    {
+        if (IsDisposed) return;
+        try
+        {
+            if (request.action == "fit-save-open")
+            {
+                if (zipId != null || request.outputSize < 1 || request.outputSize > 400000000
+                    || string.IsNullOrEmpty(request.name) || Path.GetFileName(request.name) != request.name
+                    || !request.name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                {
+                    Reply(request.id, "error", "Windows couldn’t prepare the ZIP save.");
+                    return;
+                }
+                zipId = request.id;
+                using (var dialog = new SaveFileDialog {
+                    FileName = request.name, DefaultExt = "zip", Filter = "ZIP archive (*.zip)|*.zip",
+                    RestoreDirectory = true, Title = "Save from Pocketspace"
+                })
+                {
+                    if (dialog.ShowDialog(this) != DialogResult.OK || zipId != request.id)
+                    {
+                        ResetFitSave();
+                        Reply(request.id, "cancelled", null);
+                        return;
+                    }
+                    zipPath = dialog.FileName;
+                }
+                zipSize = request.outputSize;
+                zipStagingPath = Path.Combine(Path.GetDirectoryName(zipPath), ".pocketspace-" + Guid.NewGuid().ToString("N") + ".tmp");
+                zipStream = new FileStream(zipStagingPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+            }
+            else if (zipId != request.id) return;
+            else if (request.action == "fit-save-chunk")
+            {
+                if (zipStream == null || request.data == null || request.data.Length > 350000) throw new IOException();
+                var bytes = Convert.FromBase64String(request.data);
+                if (zipStream.Length + bytes.Length > zipSize) throw new IOException();
+                zipStream.Write(bytes, 0, bytes.Length);
+            }
+            else if (request.action == "fit-save-end")
+            {
+                if (zipStream == null || zipStream.Length != zipSize) throw new IOException();
+                zipStream.Dispose();
+                zipStream = null;
+                if (File.Exists(zipPath)) File.Replace(zipStagingPath, zipPath, null);
+                else File.Move(zipStagingPath, zipPath);
+                ResetFitSave();
+            }
+            else if (request.action == "fit-save-cancel")
+            {
+                ResetFitSave();
+                return;
+            }
+            Reply(request.id, "ok", null);
+        }
+        catch (Exception error)
+        {
+            if (zipId == request.id) ResetFitSave();
+            Reply(request.id, "error", "Windows couldn’t save the ZIP. " + error.Message);
+        }
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs args)
+    {
+        ResetFitSave();
+        base.OnFormClosed(args);
     }
 
     private void ConfirmBatch(ReplacementMessage message, List<string> paths)

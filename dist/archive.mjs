@@ -1,4 +1,5 @@
 import { createDiskOutput, diskThreshold } from './output.mjs';
+import { createMobileDiskOutput, digest, mobile } from './mobile.mjs';
 
 export const zipLimit = 400e6;
 const chunkBytes = 1024 * 1024;
@@ -10,6 +11,7 @@ export function availableItems(items, variant) {
 
 export function variantFile(item, variant) {
   if (variant === 'originals') return item.file;
+  if (item.result.blob.token) return { ...item.result.blob, name: item.result.name };
   return new File([item.result.blob], item.result.name, { type: item.result.blob.type });
 }
 
@@ -31,7 +33,7 @@ export function uniqueName(name, taken) {
 
 async function buildZip(entries, signal, { level, disk, update } = {}) {
   const { Zip, ZipDeflate, ZipPassThrough } = await import('./vendor/fflate.mjs');
-  const output = disk ? await createDiskOutput() : undefined;
+  const output = disk ? await (mobile ? createMobileDiskOutput() : createDiskOutput()) : undefined;
   const chunks = [];
   const archive = new Zip((error, chunk) => {
     if (error) throw error;
@@ -69,9 +71,10 @@ async function buildZip(entries, signal, { level, disk, update } = {}) {
   }
 }
 
-export async function zipFiles(entries, signal) {
-  const { blob } = await buildZip(entries, signal);
-  return blob;
+export function zipFiles(entries, signal) {
+  const disk = (mobile || globalThis.navigator?.storage?.getDirectory && globalThis.navigator?.locks)
+    && entries.reduce((sum, entry) => sum + entry.blob.size, 0) >= diskThreshold;
+  return buildZip(entries, signal, { disk });
 }
 
 export async function compressFileToZip(file, profile, signal, update) {
@@ -88,10 +91,10 @@ export async function contentId(blob, signal) {
   for (let offset = 0, index = 0; offset < blob.size; offset += chunkBytes, index += 32) {
     signal.throwIfAborted();
     const chunk = await blob.slice(offset, offset + chunkBytes).arrayBuffer();
-    hashes.set(new Uint8Array(await crypto.subtle.digest('SHA-256', chunk)), index);
+    hashes.set(await digest(chunk), index);
   }
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', hashes));
-  const id = Array.from(digest, byte => byte.toString(16).padStart(2, '0')).join('');
+  const hash = await digest(hashes);
+  const id = Array.from(hash, byte => byte.toString(16).padStart(2, '0')).join('');
   contentIds.set(blob, id);
   return id;
 }

@@ -1,6 +1,8 @@
 # Pocketspace
 
-Pocketspace compresses photos, videos, and other files on your device. It runs as a Windows desktop app and can also run in a browser for local development.
+Pocketspace compresses photos, videos, and other files. It runs as a Windows desktop app, has Android and iOS projects, and can run in a browser for local development.
+
+[Open Pocketspace in your browser](https://metanmai.github.io/pocketspace/) or [download Pocketspace for Windows](https://github.com/metanmai/pocketspace/releases/latest/download/Pocketspace-Windows-x64.zip).
 
 ## Windows download
 
@@ -30,3 +32,5 @@ Download `Pocketspace-Windows-x64.zip` from the [latest release](https://github.
 ## Development
 
 Run `node serve.mjs` from the project root and open `http://127.0.0.1:4173`. Use a browser with WebCodecs support for video compression. The web assets live in `dist`. The Windows host and build instructions are in [desktop](desktop/README.md).
+
+See [mobile](mobile/README.md) for the Android and iOS implementation plan, build instructions, and verification steps.

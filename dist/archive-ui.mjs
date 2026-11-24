@@ -1,4 +1,5 @@
 import { archiveZip, availableItems, syncArchive, variantFile, zipLimit } from './archive.mjs';
+import { mediaUrl, mobile, mobilePlatform, revokeMediaUrl, saveMobile, shareMobile } from './mobile.mjs';
 
 export function bindArchive(getItems) {
   const dialog = document.getElementById('archive');
@@ -13,9 +14,10 @@ export function bindArchive(getItems) {
   const shareHelp = dialog.querySelector('#archive-share-help');
   const cloudHelp = dialog.querySelector('#archive-cloud-help');
   const windowsApp = window.pocketspaceHost === 'windows';
-  const pickerSupported = typeof window.showDirectoryPicker === 'function' && window.top === window;
+  const pickerSupported = !mobile && typeof window.showDirectoryPicker === 'function' && window.top === window;
   if (windowsApp) zip.querySelector('span').textContent = 'Prepare ZIP to share';
   let packageUrl;
+  let archiveOutput;
   let task;
   let snapshot = [];
 
@@ -30,6 +32,7 @@ export function bindArchive(getItems) {
   }
 
   function canShare(items, variant) {
+    if (mobile) return items.length > 0;
     if (windowsApp || !items.length || !navigator.share || !navigator.canShare) return false;
     try { return navigator.canShare(shareData(items, variant)); } catch { return false; }
   }
@@ -47,6 +50,8 @@ export function bindArchive(getItems) {
     zip.hidden = Boolean(packageUrl);
     zip.disabled = Boolean(task) || !fileCount || tooLarge;
     download.hidden = !packageUrl;
+    if (task) download.setAttribute('aria-disabled', 'true');
+    else download.removeAttribute('aria-disabled');
     zipHelp.hidden = !tooLarge;
     if (windowsApp) {
       shareHelp.textContent = 'Prepare and save a ZIP, then add it in LocalSend to send it over the same Wi-Fi.';
@@ -64,7 +69,9 @@ export function bindArchive(getItems) {
   }
 
   function resetZip() {
-    if (packageUrl) URL.revokeObjectURL(packageUrl);
+    revokeMediaUrl(packageUrl);
+    void archiveOutput?.dispose?.();
+    archiveOutput = undefined;
     packageUrl = undefined;
     download.removeAttribute('href');
   }
@@ -111,22 +118,47 @@ export function bindArchive(getItems) {
 
   if (!windowsApp) {
     share.addEventListener('click', () => void run(async ({ items, variant }, signal) => {
-      await navigator.share(shareData(items, variant));
-      if (!signal.aborted) status.textContent = 'Handed to the share menu. Check your receiving device for the transfer.';
+      if (mobile) {
+        const entries = items.map(item => {
+          const file = variantFile(item, variant);
+          return { file, name: file.name };
+        });
+        await shareMobile(entries, signal);
+      } else {
+        await navigator.share(shareData(items, variant));
+      }
+      if (!signal.aborted) status.textContent = mobilePlatform === 'android'
+        ? 'Opened the share sheet.'
+        : 'Handed to the share menu. Check your receiving device for the transfer.';
     }, 'The share menu couldn’t send these files. Try downloading the ZIP.'));
   }
 
   zip.addEventListener('click', () => void run(async ({ items, variant }, signal) => {
     status.textContent = 'Preparing ZIP and matching-file index…';
-    const blob = await archiveZip(items, variant, signal);
+    const output = await archiveZip(items, variant, signal);
+    if (signal.aborted) await output.dispose?.();
     signal.throwIfAborted();
-    packageUrl = URL.createObjectURL(blob);
+    archiveOutput = output;
+    packageUrl = mediaUrl(output.blob);
     download.href = packageUrl;
     download.download = `Pocketspace-${variant}.zip`;
     status.textContent = 'ZIP ready. It includes an index linking originals and compressed copies.';
     render();
     download.focus();
   }, 'Couldn’t prepare the ZIP. Try a smaller batch.'));
+
+  if (mobile) {
+    download.querySelector('span').textContent = 'Save ZIP';
+    download.addEventListener('click', event => {
+      event.preventDefault();
+      if (!archiveOutput) return;
+      const { blob } = archiveOutput;
+      void run(async (_, signal) => {
+        await saveMobile(blob, download.download, signal);
+        if (!signal.aborted) status.textContent = 'ZIP saved.';
+      }, 'Couldn’t save the ZIP.');
+    });
+  }
 
   folder.addEventListener('click', () => void run(async ({ items, variant }, signal) => {
     const destination = await window.showDirectoryPicker({ mode: 'readwrite', id: 'pocketspace-archive' });

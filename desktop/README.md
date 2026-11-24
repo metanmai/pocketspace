@@ -12,13 +12,27 @@ Pocketspace re-encodes photos up to 64 megapixels. Large videos and lossless ZIP
 
 After compression, **Replace originals** in **Your files** uses the files you already added. Confirm once in Windows to replace every eligible original with its smaller same-format copy. Pocketspace verifies each original and its compressed bytes before replacing it. Format conversions and ZIPs are available through **Save copy**.
 
-To share files from Windows, open **Transfer & archive**, choose originals or compressed copies, then select **Prepare ZIP to share**. Save the ZIP and open it from your sharing app.
+Open **Fit to Send** under **Your files** to fit photos and videos under one ZIP size limit. Use **Keep original** for files you want preserved byte for byte. After preparation, preview the exact files under **In the ZIP**. **Keep original and refit** updates the archive. If the batch cannot fit, **Split into ZIPs** lets you prepare and save numbered parts separately.
+
+Enable **Remove location metadata from photos** to generate fresh photo copies without their original embedded metadata. Windows checks kept JPEG, PNG, and WebP photos for common location tags and flags originals it cannot check. Kept originals retain their bytes and metadata.
+
+Use **Save ZIP** to pick a location in Windows, then attach the ZIP from your sharing app. To open files directly in Fit to Send, select them in File Explorer and choose **Show more options → Send to → Pocketspace**. The build installs this shortcut for the current Windows user. On another PC, you can drop files onto the packaged executable to open them the same way.
+
+**Transfer & archive** also supports ZIPs of all original or compressed copies without a custom size limit.
 
 ## Build
 
 Run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1` from the project root. Close Pocketspace before rebuilding. The build downloads the pinned WebView2 SDK and copies the current web assets into the Windows package.
 
 ## Verification
+
+Fit to Send was verified end to end in the rebuilt Windows executable with WebView2 and the native Save ZIP dialog:
+
+- Two launch-path photos opened Fit to Send and saved to a 564,397-byte ZIP under a 600,000-byte limit. Both entries matched the originals byte for byte. The installed Send to shortcut points to this executable.
+- An impossible refit hid the stale ZIP. Raising the cap restored the original preview, which matched both the input and the resaved archive entry.
+- An impossible split exposed no partial archives. After raising the limit, both numbered archives saved individually at 215,741 and 348,678 bytes under a 400,000-byte cap.
+- The compressed MP4 preview played and matched the archived bytes. The mixed ZIP was 111,641 bytes under a 247,376-byte cap, and its kept photo matched the input.
+- A JPEG carrying test EXIF GPS data triggered the warning when kept. The original retained its bytes, and the cleaned preview matched the archived copy without that EXIF block.
 
 The packaged app launched on Windows, compressed the bundled JPG by 31% and MP4 by 36% at the Balanced setting, generated a batch ZIP, and opened the native save dialog with the expected ZIP filename. The dialog was dismissed without writing a test file.
 

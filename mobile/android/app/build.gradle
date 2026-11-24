@@ -1,0 +1,29 @@
+plugins {
+    id 'com.android.application' version '8.12.2'
+}
+
+android {
+    namespace 'com.pocketspace.app'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.pocketspace.app'
+        minSdk 30
+        targetSdk 36
+        versionCode 1
+        versionName '1.0'
+    }
+
+    sourceSets.main.assets.srcDir('../../../dist')
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+    implementation 'androidx.media3:media3-transformer:1.8.0'
+    implementation 'androidx.media3:media3-effect:1.8.0'
+}

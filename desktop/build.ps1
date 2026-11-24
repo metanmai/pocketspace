@@ -33,6 +33,11 @@ try {
     Copy-Item -LiteralPath $exe,$core,$forms,$loader -Destination $output -Force
     Copy-Item -LiteralPath (Join-Path $sdk 'LICENSE.txt') -Destination (Join-Path $output 'WebView2-LICENSE.txt') -Force
     Copy-Item -LiteralPath (Join-Path $project 'dist') -Destination $output -Recurse -Force
+    $sendTo = [Environment]::GetFolderPath([Environment+SpecialFolder]::SendTo)
+    $shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $sendTo 'Pocketspace.lnk'))
+    $shortcut.TargetPath = Join-Path $output 'Pocketspace.exe'
+    $shortcut.WorkingDirectory = $output
+    $shortcut.Save()
     Write-Output (Join-Path $output 'Pocketspace.exe')
 }
 finally {
