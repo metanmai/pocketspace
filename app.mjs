@@ -6,7 +6,7 @@ import { mediaUrl, mobile, pickFiles, playNative, receiveSharedPhotos, releaseFi
 
 const $ = id => document.getElementById(id);
 const files = [];
-$('windows-download').hidden = mobile || window.pocketspaceHost === 'windows';
+document.documentElement.classList.toggle('web-presentation', !mobile && window.pocketspaceHost !== 'windows');
 const updateArchive = bindArchive(() => files);
 const fitToSend = bindFitToSend(() => files, bytes, saveWindowsZip);
 const labels = { detail: 'More detail', balanced: 'Balanced', small: 'Smallest files' };

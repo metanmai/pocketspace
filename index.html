@@ -31,7 +31,10 @@
   <header class="topbar">
     <div class="top-inner">
       <a class="wordmark" href="./" aria-label="Pocketspace home"><span class="mark"><svg><use href="#logo"/></svg></span>Pocketspace</a>
-      <a id="windows-download" class="button accent" href="https://github.com/metanmai/pocketspace/releases/latest/download/Pocketspace-Windows-x64.zip"><svg aria-hidden="true"><use href="#download"/></svg> Download for Windows</a>
+      <nav class="web-only web-nav" aria-label="Site navigation">
+        <a href="#how-it-works">How it works</a>
+        <a id="windows-download" class="button" href="https://github.com/metanmai/pocketspace/releases/latest/download/Pocketspace-Windows-x64.zip">Download for Windows</a>
+      </nav>
     </div>
   </header>
 
@@ -41,6 +44,16 @@
         <p class="eyebrow"><svg><use href="#spark"/></svg> FILE COMPRESSOR</p>
         <h1 id="headline">Make room for more.</h1>
         <p>Shrink photos, videos, and other files.<br class="desktop-break"> See what you save, then keep the smaller copy.</p>
+        <div class="web-only web-hero-actions">
+          <a class="button accent" href="#compressor">Use Pocketspace online</a>
+          <a class="button" href="https://github.com/metanmai/pocketspace/releases/latest/download/Pocketspace-Windows-x64.zip">Download for Windows</a>
+        </div>
+      </div>
+      <div class="web-only web-demo" aria-label="Example Fit to Send result">
+        <div class="web-demo-title"><svg aria-hidden="true"><use href="#layers"/></svg> Fit to Send <small>Example</small></div>
+        <div><span>Original files</span><strong>18.4 MB</strong></div>
+        <div><span>ZIP size limit</span><strong>10 MB</strong></div>
+        <div class="web-demo-result"><span>ZIP ready</span><strong>9.8 MB</strong></div>
       </div>
       <svg class="hero-art" viewBox="0 0 420 250" fill="none" aria-hidden="true">
         <defs>
@@ -74,7 +87,7 @@
       </svg>
     </section>
 
-    <div class="workspace">
+    <div class="workspace" id="compressor">
       <div class="primary">
         <section class="card add-card" aria-labelledby="add-heading">
           <div class="section-heading">
@@ -125,6 +138,14 @@
         <p class="compatibility">* HEIC and video codec support vary by device. Compressed copies may omit camera metadata.</p>
       </aside>
     </div>
+    <section class="web-only web-guide" id="how-it-works" aria-labelledby="guide-title">
+      <h2 id="guide-title">How Fit to Send works</h2>
+      <div class="web-guide-grid">
+        <article><h3>Add your files</h3><p>Pick photos and videos. Pocketspace processes them on your device.</p></article>
+        <article><h3>Set the limit</h3><p>Enter the ZIP size your destination accepts. Mark important files to keep their original bytes.</p></article>
+        <article><h3>Preview and download</h3><p>Check the exact files in the ZIP. Split the batch into numbered ZIPs when one archive can’t fit.</p></article>
+      </div>
+    </section>
   </main>
 
   <dialog id="preview" aria-labelledby="preview-title">
