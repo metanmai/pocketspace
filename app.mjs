@@ -7,6 +7,26 @@ import { mediaUrl, mobile, pickFiles, playNative, receiveSharedPhotos, releaseFi
 const $ = id => document.getElementById(id);
 const files = [];
 document.documentElement.classList.toggle('web-presentation', !mobile && window.pocketspaceHost !== 'windows');
+const themePicker = $('theme');
+const systemTheme = matchMedia('(prefers-color-scheme: dark)');
+function applyTheme() {
+  const choice = themePicker.value;
+  document.documentElement.dataset.theme = choice === 'system' ? (systemTheme.matches ? 'dark' : 'warm') : choice;
+  document.querySelector('meta[name="theme-color"]').content =
+    getComputedStyle(document.documentElement).getPropertyValue('--page').trim();
+}
+try {
+  const saved = localStorage.getItem('pocketspace-theme');
+  if ([...themePicker.options].some(option => option.value === saved)) themePicker.value = saved;
+} catch {}
+applyTheme();
+themePicker.addEventListener('change', () => {
+  applyTheme();
+  try { localStorage.setItem('pocketspace-theme', themePicker.value); } catch {}
+});
+systemTheme.addEventListener('change', () => {
+  if (themePicker.value === 'system') applyTheme();
+});
 const updateArchive = bindArchive(() => files);
 const fitToSend = bindFitToSend(() => files, bytes, saveWindowsZip);
 const labels = { detail: 'More detail', balanced: 'Balanced', small: 'Smallest files' };
